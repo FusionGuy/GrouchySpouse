@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿using System;
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -16,14 +16,16 @@ namespace GrouchySpouse
 {
     class Program
     {
-        private static readonly string OPENAI_API_TOKEN = "gsk_XXXX";
-        private static readonly string AUDIO_API_TOKEN = "sk-XXXX";
+        private static readonly string OPENAI_API_TOKEN = "gsk_XXX";
+        private static readonly string AUDIO_API_TOKEN = "sk-XXX";
 
         private static readonly HttpClient _openAIClient = new();
 
         private static string? SYSTEM_PROMPT;
 
-        private static readonly string TTS_VOICE = "sage"; // Available voices: alloy, ash, coral, echo, fable, onyx, nova, sage, shimmer   
+        private static readonly string[] VOICES = { "alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer" };
+
+        private static string TTS_VOICE = "sage"; // Available voices: alloy, ash, coral, echo, fable, onyx, nova, sage, shimmer
 
         /// <summary>
         /// Using this for the API timeout for TTS audio download. (In seconds)
@@ -33,6 +35,19 @@ namespace GrouchySpouse
         static async Task Main(string[] args)
         {
             Console.Clear();
+            if (args.Length > 0)
+            {
+                string voiceArg = args[0];
+                if (Array.Exists(VOICES, v => v.Equals(voiceArg, StringComparison.OrdinalIgnoreCase)))
+                {
+                    TTS_VOICE = voiceArg;
+                }
+                else
+                {
+                    Console.WriteLine("Invalid voice provided. Allowed voices are: " + string.Join(", ", VOICES));
+                    return;
+                }
+            }
             InitializeClients();
             SYSTEM_PROMPT = await File.ReadAllTextAsync("system_prompt.txt"); // read the system prompt from a flat text file
 
@@ -114,6 +129,8 @@ namespace GrouchySpouse
                     { HttpRequestHeader.Authorization.ToString(), "Bearer " + AUDIO_API_TOKEN },
                     { HttpRequestHeader.Accept.ToString(), "application/json" }
                 },
+
+                // Formats the input as JSON
                 Content = JsonContent.Create(inputBody)
             };
 
@@ -136,7 +153,7 @@ namespace GrouchySpouse
             var response = await downloadTask;
             var byteArray = await response.Content.ReadAsByteArrayAsync();
             await File.WriteAllBytesAsync("tts.mp3", byteArray);
-            Console.WriteLine("Audio downloaded successfully.");
+            //Console.WriteLine("Audio downloaded successfully.");
 
             PlayAudioAsync("tts.mp3").Wait();
         }
