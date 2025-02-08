@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
+﻿﻿﻿﻿﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -9,21 +9,26 @@ using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
+using System.Net;
 
 
 namespace GrouchySpouse
 {
     class Program
     {
+        private static readonly string OPENAI_API_TOKEN = "gsk_XXXX";
+        private static readonly string AUDIO_API_TOKEN = "sk-XXXX";
+
         private static readonly HttpClient _openAIClient = new();
-        private static readonly HttpClient _replicateClient = new();
 
         private static string? SYSTEM_PROMPT;
 
+        private static readonly string TTS_VOICE = "sage"; // Available voices: alloy, ash, coral, echo, fable, onyx, nova, sage, shimmer   
+
         /// <summary>
-        /// Using this for the API timeout for Replicate API. If it doesn't response within X seconds, only the LLM response will be used - no audio.
+        /// Using this for the API timeout for TTS audio download. (In seconds)
         /// </summary>
-        private static short _apiTimeout = 8;  // API timeout in seconds
+        private static short _apiTimeout = 10;  // OpenAI TTS API timeout in seconds
 
         static async Task Main(string[] args)
         {
@@ -37,19 +42,10 @@ namespace GrouchySpouse
 
         static void InitializeClients()
         {
-            // DeepSeek or other "Open" AI API
-            //_openAIClient.BaseAddress = new Uri("https://api.deepseek.com/");
-
+            _openAIClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             _openAIClient.BaseAddress = new Uri("https://api.groq.com/openai/v1/");
-            //_openAIClient.DefaultRequestHeaders.Authorization = 
-            //    new AuthenticationHeaderValue("Bearer", "sk-XXXS");
-
-            _openAIClient.DefaultRequestHeaders.Authorization = 
-                new AuthenticationHeaderValue("Bearer", "gsk_XXX");
-            
-            // Replicate API
-            _replicateClient.DefaultRequestHeaders.Authorization = 
-               new AuthenticationHeaderValue("Bearer", "r8_XXX");
+            _openAIClient.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", OPENAI_API_TOKEN);
         }
 
         /// <summary>
@@ -77,15 +73,8 @@ namespace GrouchySpouse
                 else
                 {
                     Console.WriteLine("If you want her to talk, you have to give me something to say!");
+                    continue;
                 }
-
-                //var response = await _openAIClient.PostAsJsonAsync("chat/completions", new
-                //{
-                //    model = "deepseek-chat",
-                //    messages = history,
-                //    stream = false
-                //});
-
 
                 var response = await _openAIClient.PostAsJsonAsync("chat/completions", new
                 {
@@ -109,109 +98,47 @@ namespace GrouchySpouse
         /// <summary>
         /// The talking part of the bot
         /// </summary>
-        /// <param name="text"></param>
+        /// <param name="text">The spoken text</param>
         /// <returns></returns>
         static async Task SynthesizeAndPlayAudio(string text)
         {
-            try
+            var inputBody = new InputBody("tts-1", text, TTS_VOICE, 1.0m);
+
+            var httpClient = new HttpClient();
+            var httpRequestMessage = new HttpRequestMessage
             {
-                var prediction = await CreatePrediction(text);
-                var outputUrl = await WaitForPredictionCompletion(prediction.Id);
-    
-                if (String.IsNullOrEmpty(outputUrl))
+                Method = HttpMethod.Post,
+                RequestUri = new Uri("https://api.openai.com/v1/audio/speech"),
+                Headers =
                 {
-                    Console.WriteLine("No audio will be played.");
+                    { HttpRequestHeader.Authorization.ToString(), "Bearer " + AUDIO_API_TOKEN },
+                    { HttpRequestHeader.Accept.ToString(), "application/json" }
+                },
+                Content = JsonContent.Create(inputBody)
+            };
+
+            var downloadTask = httpClient.SendAsync(httpRequestMessage);
+            Console.Write("Downloading audio");
+
+            var timeoutTask = Task.Delay(_apiTimeout * 1000);
+            while (!downloadTask.IsCompleted)
+            {
+                if (timeoutTask.IsCompleted)
+                {
+                    Console.WriteLine("\nTimed out while waiting for audio to download...");
                     return;
                 }
-                else
-                {
-                    var tempFile = Path.GetTempFileName();
-    
-    #if DEBUG
-                    Console.WriteLine($"\nWriting audio file \"{outputUrl}\" to \"{tempFile}\"");  // Debug-only logging
-    #endif
-                    await DownloadAudioFile(outputUrl, tempFile);
-                    await PlayAudioAsync(tempFile);
-    #if DEBUG
-                    Console.WriteLine("Deleting audio file \"{0}\"\n", tempFile);
-    #endif
-                    File.Delete(tempFile);  // Clean up the temp file after playing
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error generating audio: {ex.Message}");
-            }
-        }
-
-    /// <summary>
-    /// Obtains a prediction from the Replicate API
-    /// </summary>
-    /// <param name="text"></param>
-    /// <returns></returns>
-    /// <exception cref="InvalidOperationException"></exception>
-        static async Task<ReplicateCreateResponse> CreatePrediction(string text)
-        {
-            var response = await _replicateClient.PostAsJsonAsync("https://api.replicate.com/v1/predictions", new
-            {
-                version = "dfdf537ba482b029e0a761699e6f55e9162cfd159270bfe0e44857caa5f275a6",
-                input = new
-                {
-                    text = text,
-                    language = "en",
-                    temperature = 0.5,
-                    length = 1.0,
-                    speed = 1.1,
-                    voice = "af_bella" // af_bella, af_zoe, af_lisa, af_mia, af_samantha, af_olivia, af_isabella
-                }
-            });
-
-            var result = await response.Content.ReadFromJsonAsync<ReplicateCreateResponse>() ?? throw new InvalidOperationException("Failed to deserialize the response.");
-            return result;
-        }
-
-        /// <summary>
-        /// Waits for the prediction to complete
-        /// </summary>
-        /// <param name="predictionId"></param>
-        /// <returns></returns>
-        /// <exception cref="InvalidOperationException"></exception>
-        /// <summary>
-        /// Waits for prediction completion with timeout handling
-        /// </summary>
-        static async Task<string> WaitForPredictionCompletion(string predictionId)
-        {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_apiTimeout));
-            var statusResponse = new ReplicateStatusResponse { Status = "starting", Output = string.Empty };
-            var apiUrl = $"https://api.replicate.com/v1/predictions/{predictionId}";
-            
-            try
-            {
-                // Poll the API until the prediction is complete or the _apiTimeout value is reached
-                while (statusResponse.IsProcessing() && !cts.Token.IsCancellationRequested)
-                {
-                    Console.WriteLine("Polling Replicate API status...");
-                    await Task.Delay(1000, cts.Token);
-                    
-                    var response = await _replicateClient.GetAsync(apiUrl, cts.Token);
-                    response.EnsureSuccessStatusCode();
-                    
-                    statusResponse = await response.Content.ReadFromJsonAsync<ReplicateStatusResponse>()
-                        ?? throw new InvalidOperationException("Invalid API response format");
-                }
-            }
-            catch (TaskCanceledException) when (cts.IsCancellationRequested)
-            {
-                Console.WriteLine("API request timed out after {0} seconds", _apiTimeout);
-                return ""; // return an empty string to the caller so it knows no audio is to be played
-            }
-            catch (HttpRequestException ex)
-            {
-                Console.WriteLine($"HTTP Error: {ex.StatusCode}");
-                throw;
+                Console.Write(".");
+                await Task.Delay(200);
             }
 
-            return statusResponse.SucceededWithOutput();
+            Console.WriteLine();
+            var response = await downloadTask;
+            var byteArray = await response.Content.ReadAsByteArrayAsync();
+            await File.WriteAllBytesAsync("tts.mp3", byteArray);
+            Console.WriteLine("Audio downloaded successfully.");
+
+            PlayAudioAsync("tts.mp3").Wait();
         }
 
         /// <summary>
@@ -285,26 +212,34 @@ namespace GrouchySpouse
             public required string Content { get; set; }
         }
     }
-
-    public class ReplicateCreateResponse
-    {
-        [JsonPropertyName("id")]
-        [JsonRequired]
-        public required string Id { get; set; }
-    }
-
-    public class ReplicateStatusResponse
-    {
-        public required string Status { get; set; }
-        public required string Output { get; set; }
-
-        public bool IsProcessing() => Status == "starting" || Status == "processing";
-        
         /// <summary>
-        /// Helper function to indicate process status. Useful for API timeout handling.
+        /// Input body for the request
         /// </summary>
-        /// <returns></returns>
-        public string SucceededWithOutput() =>
-            Status == "succeeded" && !string.IsNullOrEmpty(Output) ? Output : string.Empty;
-    }
+        public class InputBody
+        {
+            /// <summary>
+            /// LLM to use for the request
+            /// </summary>
+            public string Model { get; set; }
+            /// <summary>
+            /// Text to be converted to speech
+            /// </summary>
+            public string Input { get; set; }
+            /// <summary>
+            /// Available voices: alloy, ash, coral, echo, fable, onyx, nova, sage, shimmer
+            /// </summary>
+            public string Voice { get; set; }
+            /// <summary>
+            /// Playback speed of the audio
+            /// </summary>
+            public decimal Speed { get; set; }
+
+            public InputBody(string model, string input, string voice, decimal speed)
+            {
+                Model = model;
+                Input = input;
+                Voice = voice;
+                Speed = speed;
+            }
+        }
 }

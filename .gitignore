@@ -48,3 +48,6 @@ global.json
 
 # Ignore VS Code files
 .vscode/
+
+# Ignore generated audio
+.mp3
