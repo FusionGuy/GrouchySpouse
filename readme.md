@@ -42,11 +42,11 @@ A fun project that leverages multi-platform audio to produce a grouchy version o
 ## Usage
 
 1. Run the application:
-    ```sh
+    ```
     dotnet run
     ```
 The application can be run with command-line parameters. 
-    ```sh
+    ```
 dotnet run --voice sage --model llama-3.3-70b-versatile 
     ```
 2. The application will read the system prompt from [system_prompt.txt]) and display it.
