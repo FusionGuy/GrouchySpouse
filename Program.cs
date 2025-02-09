@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -16,14 +16,16 @@ namespace GrouchySpouse
 {
     class Program
     {
-        private static readonly string OPENAI_API_TOKEN = "gsk_XXX";
-        private static readonly string AUDIO_API_TOKEN = "sk-XXX";
+        private static readonly string OPENAI_API_TOKEN = "gsk_XXXX";
+        private static readonly string AUDIO_API_TOKEN = "sk-XXXX";
 
         private static readonly HttpClient _openAIClient = new();
 
         private static string? SYSTEM_PROMPT;
 
         private static readonly string[] VOICES = { "alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer" };
+
+        private static string MODEL = "llama-3.3-70b-versatile";
 
         private static string TTS_VOICE = "sage"; // Available voices: alloy, ash, coral, echo, fable, onyx, nova, sage, shimmer
 
@@ -35,19 +37,51 @@ namespace GrouchySpouse
         static async Task Main(string[] args)
         {
             Console.Clear();
-            if (args.Length > 0)
+            for (int i = 0; i < args.Length; i++)
             {
-                string voiceArg = args[0];
-                if (Array.Exists(VOICES, v => v.Equals(voiceArg, StringComparison.OrdinalIgnoreCase)))
+                if (args[i] == "-model")
                 {
-                    TTS_VOICE = voiceArg;
+                    if (i + 1 < args.Length)
+                    {
+                        MODEL = args[i + 1];
+                        i++; // Skip next argument since it's used for the model.
+                    }
+                    else
+                    {
+                        Console.WriteLine("No model specified after -model.");
+                        return;
+                    }
+                }
+                else if (args[i] == "-voice")
+                {
+                    if (i + 1 < args.Length)
+                    {
+                        if (Array.Exists(VOICES, v => v.Equals(args[i + 1], StringComparison.OrdinalIgnoreCase)))
+                        {
+                            TTS_VOICE = args[i + 1];
+                            i++; // Skip next argument since it's used for the voice.
+                        }
+                        else
+                        {
+                            Console.WriteLine("Unknown voice specified after -voice.");
+                            Console.WriteLine("Available voices: alloy, ash, coral, echo, fable, onyx, nova, sage, shimmer");
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("No voice specified after -voice.");
+                        Console.WriteLine("Available voices: alloy, ash, coral, echo, fable, onyx, nova, sage, shimmer");
+                        return;
+                    }
                 }
                 else
                 {
-                    Console.WriteLine("Invalid voice provided. Allowed voices are: " + string.Join(", ", VOICES));
+                    Console.WriteLine($"Unknown argument: {args[i]}");
                     return;
                 }
             }
+
             InitializeClients();
             SYSTEM_PROMPT = await File.ReadAllTextAsync("system_prompt.txt"); // read the system prompt from a flat text file
 
@@ -93,7 +127,7 @@ namespace GrouchySpouse
 
                 var response = await _openAIClient.PostAsJsonAsync("chat/completions", new
                 {
-                    model = "llama-3.3-70b-versatile",
+                    model = MODEL,
                     messages = history,
                     stream = false
                 });
@@ -134,11 +168,11 @@ namespace GrouchySpouse
                 Content = JsonContent.Create(inputBody)
             };
 
-            var downloadTask = httpClient.SendAsync(httpRequestMessage);
+            var audioDownloadTask = httpClient.SendAsync(httpRequestMessage);
             Console.Write("Downloading audio");
 
             var timeoutTask = Task.Delay(_apiTimeout * 1000);
-            while (!downloadTask.IsCompleted)
+            while (!audioDownloadTask.IsCompleted)
             {
                 if (timeoutTask.IsCompleted)
                 {
@@ -150,7 +184,7 @@ namespace GrouchySpouse
             }
 
             Console.WriteLine();
-            var response = await downloadTask;
+            var response = await audioDownloadTask;
             var byteArray = await response.Content.ReadAsByteArrayAsync();
             await File.WriteAllBytesAsync("tts.mp3", byteArray);
             //Console.WriteLine("Audio downloaded successfully.");
