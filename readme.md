@@ -12,8 +12,8 @@ A fun project that leverages multi-platform audio to produce a grouchy version o
 ## Prerequisites
 
 - .NET SDK
-- An API key for OpenAI
-- An API key for Replicate![Uploading th.jpg…]()
+- An API key Groq Cloud
+- An API key for OpenAI "tts-1" model for speech systhesis
 
 
 ## Setup
@@ -45,6 +45,8 @@ A fun project that leverages multi-platform audio to produce a grouchy version o
     ```sh
     dotnet run
     ```
+The application can be run with command-line parameters. 
+dotnet run --voice sage --model llama-3.3-70b-versatile 
 
 2. The application will read the system prompt from [system_prompt.txt]) and display it.
 
