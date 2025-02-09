@@ -1,6 +1,9 @@
 # GrouchySpouse
 
-A fun project that leverages multi-platform audio to produce a grouchy version of your spouse or partner. Change the system prompt by modifying system_prompt.txt. Easy! ![th](https://github.com/user-attachments/assets/36968083-6b90-4130-9c1d-fd47780737de)
+A fun project that leverages multi-platform audio to produce a grouchy version of your spouse or partner. Change the system prompt by modifying system_prompt.txt. Easy! 
+
+
+![th](https://github.com/user-attachments/assets/36968083-6b90-4130-9c1d-fd47780737de)
 
 
 ## Features
@@ -25,12 +28,12 @@ A fun project that leverages multi-platform audio to produce a grouchy version o
 
 2. Create a [system_prompt.txt](http://_vscodecontentref_/0) file in the project directory with the desired system prompt content.
 
-3. Update the API keys in the [InitializeClients](http://_vscodecontentref_/1) method in [Program.cs](http://_vscodecontentref_/2):
+3. Update the API keys: OpenAI token w/ access to the tts-1 model and Groq Cloud API token
     ```csharp
     _openAIClient.DefaultRequestHeaders.Authorization = 
-        new AuthenticationHeaderValue("Bearer", "your-openai-api-key");
+        new AuthenticationHeaderValue("Bearer", "GROQ CLOUD API TOKEN");
     _replicateClient.DefaultRequestHeaders.Authorization = 
-        new AuthenticationHeaderValue("Bearer", "your-replicate-api-key");
+        new AuthenticationHeaderValue("Bearer", "OPENAI API TOKEN");
     ```
 
 4. Build and run the project:
@@ -41,14 +44,13 @@ A fun project that leverages multi-platform audio to produce a grouchy version o
 
 ## Usage
 
-1. Run the application:
+1. Run the application: (also with command-line paramters --voice and --model)
     ```
     dotnet run
+    dotnet run --voice sage --model llama-3.3-70b-versatile 
     ```
 The application can be run with command-line parameters. 
-    ```
-dotnet run --voice sage --model llama-3.3-70b-versatile 
-    ```
+
 2. The application will read the system prompt from [system_prompt.txt]) and display it.
 
 3. Start chatting with the AI assistant by typing your messages in the console.
