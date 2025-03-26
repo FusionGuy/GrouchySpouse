@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -16,8 +16,8 @@ namespace GrouchySpouse
 {
     class Program
     {
-        private static readonly string OPENAI_API_TOKEN = "gsk_XXXX";
-        private static readonly string AUDIO_API_TOKEN = "sk-XXXX";
+        private static readonly string OPENAI_API_TOKEN = "gsk_XXX";
+        private static readonly string AUDIO_API_TOKEN = "sk-XXXs";
 
         private static readonly HttpClient _openAIClient = new();
 
@@ -224,8 +224,22 @@ namespace GrouchySpouse
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 // Windows
-                var player = new System.Media.SoundPlayer(filePath);
-                player.PlaySync();
+                try
+                {
+                    using var audioFile = new AudioFileReader(filePath);
+                    using var outputDevice = new WaveOutEvent();
+                    outputDevice.Init(audioFile);
+                    outputDevice.Play();
+                    while (outputDevice.PlaybackState == PlaybackState.Playing)
+                    {
+                        await Task.Delay(100);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error playing audio: {ex.Message}");
+                    Console.WriteLine("The file format may be unsupported or there was an issue with playback.");
+                }
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
