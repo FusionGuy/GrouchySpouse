@@ -16,8 +16,8 @@ namespace GrouchySpouse
 {
     class Program
     {
-        private static readonly string OPENAI_API_TOKEN = "gsk_XXX";
-        private static readonly string AUDIO_API_TOKEN = "sk-XXXs";
+        private static readonly string OPENAI_API_TOKEN = "gsk_xxxx";
+        private static readonly string AUDIO_API_TOKEN = "sk-proj-xxxx";
 
         private static readonly HttpClient _openAIClient = new();
 
