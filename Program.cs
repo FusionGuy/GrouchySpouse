@@ -16,8 +16,8 @@ namespace GrouchySpouse
 {
     class Program
     {
-        private static readonly string OPENAI_API_TOKEN = "gsk_xxxx";
-        private static readonly string AUDIO_API_TOKEN = "sk-proj-xxxx";
+        private static readonly string OPENAI_API_TOKEN = "gsk_xxxxx";
+        private static readonly string AUDIO_API_TOKEN = "sk-proj-xxxxx";
 
         private static readonly HttpClient _openAIClient = new();
 
@@ -132,9 +132,13 @@ namespace GrouchySpouse
                     stream = false
                 });
 
+#if DEBUG
+                // Log the raw JSON response from OpenAI (useful for when you forget the error messages for things like when your API key expires and you are pulling your hair out try to figure out an otherwise obscure error message that has nothing to do with the underlying issue.)
+                //var rawJson = await response.Content.ReadAsStringAsync();
+                //Console.WriteLine("DEBUG RAW OPENAI RESPONSE: " + rawJson);
+                //var completion = System.Text.Json.JsonSerializer.Deserialize<OpenAIResponse>(rawJson);
+#endif
                 var completion = await response.Content.ReadFromJsonAsync<OpenAIResponse>();
-
-                // check for a null completion...
                 var answer = completion?.Choices?[0]?.Message?.Content ?? "No response from the model...";
                 
                 Console.WriteLine(answer);
@@ -265,15 +269,18 @@ namespace GrouchySpouse
 
     public class OpenAIResponse
     {
+        [JsonPropertyName("choices")]
         public required List<Choice> Choices { get; set; }
 
         public class Choice
         {
+            [JsonPropertyName("message")]
             public required Message Message { get; set; }
         }
 
         public class Message
         {
+            [JsonPropertyName("content")]
             public required string Content { get; set; }
         }
     }
